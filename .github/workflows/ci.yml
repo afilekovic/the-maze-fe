@@ -1,0 +1,47 @@
+name: Upload Website
+
+on:
+  push:
+    branches:
+    - main
+
+permissions:
+    id-token: write
+    contents: read    
+    
+env:
+    AWS_DEFAULT_REGION: eu-central-1
+    node-version: 18.x
+    s3-bucket: test-github-actions-st
+    cloudfront-distribution-id: E2ZW36L023SIK8
+    credentials-account: arn:aws:iam::368270126889:role/github-actions-role    
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        role-to-assume: ${{ env.credentials-account }}
+        aws-region: ${{ env.AWS_DEFAULT_REGION }}
+  
+    - name: Checkout
+      uses: actions/checkout@v3
+    
+    - name: Setup Node
+      uses: actions/setup-node@v3 
+      with: 
+        node-version: ${{ env.node-version }} 
+      
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Build
+      run: npm run build   
+
+    - name: Deploy static site to S3 bucket
+      run: aws s3 sync ./dist/ s3://${{ env.s3-bucket }} --delete
+    
+    - name: Invalidate cloudfront cache
+      run: aws cloudfront create-invalidation --distribution-id ${{ env. cloudfront-distribution-id }} --paths "/*" 
